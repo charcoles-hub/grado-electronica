@@ -198,6 +198,35 @@ summary { cursor: pointer; font-weight: 600; }
 .capgrid input, textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet); color: var(--ink); font: 400 0.9rem var(--font-mono); }
 textarea { resize: vertical; min-height: 5rem; }
 
+.file-apunte { border: 0; cursor: pointer; font-family: inherit; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.file-apunte::before { content: "✎ "; }
+.gaps li { align-items: flex-start; }
+.gap-txt { display: grid; gap: 2px; min-width: 0; }
+.gap-fill { font-size: 0.88rem; color: var(--ok); }
+.gap-fill .link { color: var(--ok); font-size: inherit; text-align: left; }
+.gap-atenea { font-size: 0.88rem; color: var(--warn); }
+.apl { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.apl-btn { width: 100%; text-align: left; background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 9px 12px; cursor: pointer; display: grid; gap: 2px; }
+.apl-btn:hover { border-color: var(--accent); }
+.apl-t { font-weight: 600; }
+.apl-c { font-size: 0.85rem; color: var(--muted); }
+.apunte { background: var(--sheet); border: 1px solid var(--rule); border-top: 4px solid var(--c); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 8px; min-width: 0; }
+.apunte-foot { border-top: 1px solid var(--rule); padding-top: 8px; font-size: 0.88rem; color: var(--muted); }
+.md { min-width: 0; overflow-wrap: anywhere; }
+.md h1 { font: 700 1.4rem/1.2 var(--font-display); margin: 0 0 8px; text-wrap: balance; }
+.md h2 { font: 700 1.15rem/1.25 var(--font-display); margin: 22px 0 6px; }
+.md h3 { font: 700 1rem var(--font-display); margin: 16px 0 4px; }
+.md p, .md li { max-width: 70ch; }
+.md blockquote { margin: 0 0 8px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; font-size: 0.92rem; }
+.md blockquote p { margin: 0; }
+.md hr { border: 0; border-top: 1px dashed var(--rule); margin: 20px 0; }
+.md .table-wrap { overflow-x: auto; margin: 8px 0; }
+.md table { border-collapse: collapse; font-size: 0.9rem; min-width: 100%; }
+.md th, .md td { border-bottom: 1px solid var(--rule); padding: 6px 8px; text-align: left; vertical-align: top; }
+.md th { font-weight: 700; background: var(--paper); }
+.md mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; padding: 4px 0; }
+.md mjx-container { color: var(--ink); }
+
 footer.foot { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--rule); font-size: 0.85rem; color: var(--muted); display: grid; gap: 4px; }
 @media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
 </style>
@@ -219,6 +248,7 @@ footer.foot { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--r
       <button role="tab" data-tab="asignaturas" aria-selected="false">Asignaturas</button>
       <button role="tab" data-tab="examenes" aria-selected="false">Exámenes</button>
       <button role="tab" data-tab="material" aria-selected="false">Material</button>
+      <button role="tab" data-tab="apuntes" aria-selected="false">Apuntes</button>
       <button role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
     </div>
   </nav>

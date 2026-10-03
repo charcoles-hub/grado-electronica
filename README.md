@@ -19,7 +19,11 @@ Grado en Ingeniería Electrónica de Telecomunicación (GREELEC, ETSETB, UPC).
   siguientes. «Hoy no puedo estudiar» libera el día.
 - **Agenda** de tres semanas, **Asignaturas** con el progreso y la previsión
   de cada examen, **Exámenes** con el calendario oficial y **Material** con
-  lo que falta descargar de Atenea según la guía docente.
+  lo que faltaba, qué apunte lo cubre y qué solo se puede sacar de Atenea.
+- Los laboratorios no están en el plan (se llevan aparte).
+- **Apuntes**: lo que faltaba en Drive según las guías docentes, redactado
+  por Claude con teoría, ejemplos y ejercicios resueltos (ver
+  [`apuntes/README.md`](apuntes/README.md)).
 - **Ajustes**: minutos por día (por defecto 2 h 30 min de lunes a sábado y
   1 h 30 min el domingo) y copia de seguridad del progreso.
 
@@ -27,6 +31,7 @@ Grado en Ingeniería Electrónica de Telecomunicación (GREELEC, ETSETB, UPC).
 
 - `plan-data.js`: asignaturas, exámenes, tareas y material (aquí se edita el plan).
 - `app.js`: planificador, cálculo del ritmo, guardado y vistas.
+- `apuntes/`: apuntes en Markdown (con fórmulas en LaTeX).
 - `app.html`: la página (se publica tal cual como Artifact).
 - `index.html`: versión completa generada con `scripts/build.sh` para abrir en
   local o servir con GitHub Pages.

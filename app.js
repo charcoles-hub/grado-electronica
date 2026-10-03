@@ -199,15 +199,67 @@
   const subjTag = s => `<span class="tag tag-${s}">${s}</span>`;
   let tab = "hoy";
   try { tab = localStorage.getItem(LS_KEY + ":tab") || "hoy"; } catch (e) { /* nada */ }
-  if (/^#(hoy|agenda|asignaturas|examenes|material|ajustes)$/.test(location.hash)) tab = location.hash.slice(1);
+  if (/^#(hoy|agenda|asignaturas|examenes|material|apuntes|ajustes)$/.test(location.hash)) tab = location.hash.slice(1);
   let openTask = null;
 
   function fileLinks(t) {
     if (!t.f || !t.f.length) return `<p class="missing">Sin material en tu Drive para esta tarea: búscalo en Atenea.</p>`;
     return `<div class="files">` + t.f.map(k => {
+      if (k.startsWith("a:")) {
+        const a = apunteById[k.slice(2)];
+        return a ? `<button class="file file-apunte" data-act="apunte" data-id="${a.id}">Apunte: ${esc(a.t)}</button>` : "";
+      }
       const f = P.FILES[k];
       return f ? `<a class="file" href="${f[1]}" target="_blank" rel="noopener">${esc(f[0])}</a>` : "";
     }).join("") + `</div>`;
+  }
+
+  const apunteById = Object.fromEntries((P.APUNTES || []).map(a => [a.id, a]));
+  let openApunte = null;
+  const mdCache = {};
+
+  // Carga perezosa: primero el Markdown (ligero) y después MathJax para las fórmulas
+  let markedPromise = null, mathPromise = null;
+  function loadScript(src) {
+    return new Promise((res, rej) => { const el = document.createElement("script"); el.src = src; el.onload = res; el.onerror = rej; document.head.appendChild(el); });
+  }
+  function loadMarked() {
+    if (!markedPromise) markedPromise = loadScript("https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js").catch(() => null);
+    return markedPromise;
+  }
+  function loadMath() {
+    if (!mathPromise) {
+      window.MathJax = { tex: { inlineMath: [["$", "$"]], displayMath: [["$$", "$$"]] }, svg: { fontCache: "global" }, startup: { typeset: false } };
+      mathPromise = loadScript("https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg-full.min.js")
+        .then(() => window.MathJax.startup && window.MathJax.startup.promise).catch(() => null);
+    }
+    return mathPromise;
+  }
+  function mdToHtml(src) {
+    const math = [];
+    const protectedSrc = src.replace(/\$\$[\s\S]+?\$\$|\$[^$\n]+?\$/g, m => { math.push(m); return "@@MATH" + (math.length - 1) + "@@"; });
+    const html = window.marked ? window.marked.parse(protectedSrc) : "<pre>" + esc(protectedSrc) + "</pre>";
+    return html.replace(/@@MATH(\d+)@@/g, (m, i) => esc(math[Number(i)]));
+  }
+  async function showApunte(id) {
+    loadMath();
+    try {
+      const [md] = await Promise.all([
+        mdCache[id] ? Promise.resolve(mdCache[id]) : fetch("apuntes/" + id + ".md").then(r => { if (!r.ok) throw new Error("http " + r.status); return r.text(); }),
+        loadMarked()
+      ]);
+      mdCache[id] = md;
+      const box = $("#apunte-body");
+      if (openApunte !== id || !box) return;
+      box.innerHTML = mdToHtml(md);
+      box.querySelectorAll("a[href^='http']").forEach(a => { a.target = "_blank"; a.rel = "noopener"; });
+      box.querySelectorAll("table").forEach(t => { const w = document.createElement("div"); w.className = "table-wrap"; t.parentNode.insertBefore(w, t); w.appendChild(t); });
+      await loadMath();
+      if (openApunte === id && $("#apunte-body") === box && window.MathJax && window.MathJax.typesetPromise) await window.MathJax.typesetPromise([box]);
+    } catch (e) {
+      const box = $("#apunte-body");
+      if (box) box.innerHTML = `<p class="missing">No se pudo cargar el apunte. Comprueba la conexión y vuelve a abrirlo. También está en el repositorio, en apuntes/${esc(id)}.md.</p>`;
+    }
   }
 
   function taskCard(t, opts) {
@@ -356,13 +408,35 @@
   }
 
   function renderMaterial() {
-    $("#view").innerHTML = `<p class="muted small">He comparado la guía docente de cada asignatura con lo que tienes en Drive. Esto es lo que falta: descárgalo de Atenea, súbelo a la carpeta de la asignatura y márcalo.</p>` +
+    $("#view").innerHTML = `<p class="muted small">Comparé la guía docente de cada asignatura con tu Drive. Lo que faltaba lo he cubierto con apuntes propios (pestaña Apuntes); aquí queda anotado qué cubre cada uno y qué solo se puede sacar de Atenea. Marca la casilla cuando tengas también el material oficial.</p>` +
       SUBJ_ORDER.map(s => {
         const gaps = P.GAPS.filter(g => g.s === s);
-        const have = gaps.filter(g => state.gaps[g.id]).length;
-        return `<section class="gapbox"><header>${subjTag(s)} <span class="muted small">${have}/${gaps.length} conseguido</span> <a class="link" href="${P.SUBJECTS[s].folder}" target="_blank" rel="noopener">Abrir carpeta</a></header>
-          <ul class="gaps">${gaps.map(g => `<li class="${state.gaps[g.id] ? "is-done" : ""}"><button class="check sm" data-act="gap" data-id="${g.id}" aria-pressed="${!!state.gaps[g.id]}" aria-label="Lo tengo"><span></span></button><span>${esc(g.t)}</span></li>`).join("")}</ul></section>`;
+        const covered = gaps.filter(g => (g.fill && g.fill.length) || state.gaps[g.id]).length;
+        return `<section class="gapbox"><header>${subjTag(s)} <span class="muted small">${covered}/${gaps.length} cubierto</span> <a class="link" href="${P.SUBJECTS[s].folder}" target="_blank" rel="noopener">Abrir carpeta</a></header>
+          <ul class="gaps">${gaps.map(g => `<li><button class="check sm" data-act="gap" data-id="${g.id}" aria-pressed="${!!state.gaps[g.id]}" aria-label="Tengo el material oficial"><span></span></button>
+            <div class="gap-txt"><span>${esc(g.t)}</span>
+            ${g.fill ? `<span class="gap-fill">Cubierto por Claude: ${g.fill.map(id => `<button class="link" data-act="apunte" data-id="${id}">${esc(apunteById[id].t)}</button>`).join(" · ")}</span>` : ""}
+            ${g.atenea ? `<span class="gap-atenea">${esc(g.atenea)}</span>` : ""}
+            </div></li>`).join("")}</ul></section>`;
       }).join("");
+  }
+
+  function renderApuntes() {
+    if (openApunte && apunteById[openApunte]) {
+      const a = apunteById[openApunte];
+      const tasks = TASKS.filter(t => (t.f || []).includes("a:" + a.id));
+      $("#view").innerHTML = `<div class="row-actions"><button class="btn ghost" data-act="apunte-close">← Todos los apuntes</button></div>
+        <article class="apunte subject-${a.s}"><header>${subjTag(a.s)}</header><div id="apunte-body" class="md"><p class="muted">Cargando el apunte…</p></div>
+        ${tasks.length ? `<footer class="apunte-foot"><b>Se usa en:</b> ${tasks.map(t => esc(t.t)).join(" · ")}</footer>` : ""}</article>`;
+      showApunte(a.id);
+      return;
+    }
+    $("#view").innerHTML = `<p class="muted small">Apuntes que he redactado para cubrir lo que faltaba en tu Drive según las guías docentes. Están pensados para estudiar y hacer tus resúmenes en papel: teoría, fórmulas, ejemplos y ejercicios resueltos. Si consigues las transparencias oficiales, mandan ellas en la notación.</p>` +
+      SUBJ_ORDER.map(s => `<section class="gapbox"><header>${subjTag(s)} <span class="muted small">${P.SUBJECTS[s].name}</span></header>
+        <ul class="apl">${P.APUNTES.filter(a => a.s === s).map(a => {
+          const gaps = P.GAPS.filter(g => (g.fill || []).includes(a.id));
+          return `<li><button class="apl-btn" data-act="apunte" data-id="${a.id}"><span class="apl-t">${esc(a.t)}</span>${gaps.length ? `<span class="apl-c">Cubre: ${gaps.map(g => esc(g.t)).join("; ")}</span>` : ""}</button></li>`;
+        }).join("")}</ul></section>`).join("");
   }
 
   function renderAjustes() {
@@ -397,7 +471,7 @@
     const today = todayStr();
     renderHeader(today);
     document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
-    ({ hoy: renderHoy, agenda: renderAgenda, asignaturas: renderAsignaturas, examenes: renderExamenes, material: renderMaterial, ajustes: renderAjustes }[tab] || renderHoy)(today);
+    ({ hoy: renderHoy, agenda: renderAgenda, asignaturas: renderAsignaturas, examenes: renderExamenes, material: renderMaterial, apuntes: renderApuntes, ajustes: renderAjustes }[tab] || renderHoy)(today);
     renderSync();
   }
 
@@ -405,13 +479,15 @@
   let resetArmed = false;
   document.addEventListener("click", e => {
     const tb = e.target.closest(".tabs button");
-    if (tb) { tab = tb.dataset.tab; openTask = null; try { localStorage.setItem(LS_KEY + ":tab", tab); } catch (x) { /* nada */ } render(); window.scrollTo(0, 0); return; }
+    if (tb) { tab = tb.dataset.tab; openTask = null; openApunte = null; try { localStorage.setItem(LS_KEY + ":tab", tab); } catch (x) { /* nada */ } render(); window.scrollTo(0, 0); return; }
     const b = e.target.closest("[data-act]");
     if (!b) return;
     const act = b.dataset.act;
     if (act === "done") toggleDone(b.dataset.id);
     else if (act === "open") { openTask = openTask === b.dataset.id ? "" : b.dataset.id; render(); }
     else if (act === "gap") toggleGap(b.dataset.id);
+    else if (act === "apunte") { openApunte = b.dataset.id; tab = "apuntes"; render(); window.scrollTo(0, 0); }
+    else if (act === "apunte-close") { openApunte = null; render(); }
     else if (act === "off") toggleOff(b.dataset.day);
     else if (act === "copy") {
       const ta = $("#backup");
